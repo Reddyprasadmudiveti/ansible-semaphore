@@ -1,0 +1,25 @@
+---
+- name: Install and Run Speedtest
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Add Ookla repository
+      shell: |
+        curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.rpm.sh | bash
+      args:
+        creates: /etc/yum.repos.d/ookla_speedtest-cli.repo
+
+    - name: Install Speedtest CLI
+      yum:
+        name: speedtest
+        state: present
+
+    - name: Run Speedtest
+      command: speedtest --accept-license --accept-gdpr
+      register: speedtest_result
+      changed_when: false
+
+    - name: Show Speedtest Results
+      debug:
+        msg: "{{ speedtest_result.stdout_lines }}"
