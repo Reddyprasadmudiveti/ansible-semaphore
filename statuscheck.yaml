@@ -1,0 +1,62 @@
+---
+- name: Update Server and Send Report
+  hosts: all
+  become: true
+
+  vars:
+    telegram_token: "{{ lookup('env', 'TELEGRAM_TOKEN') }}"
+    telegram_chat_id: "{{ lookup('env', 'TELEGRAM_CHAT_ID') }}"
+
+  tasks:
+
+    - name: Gather facts
+      setup:
+
+    - name: Check updates before upgrade
+      shell: dnf check-update
+      register: updates_before
+      failed_when: false
+      changed_when: false
+
+    - name: Upgrade all packages
+      dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: Install speedtest-cli
+      pip:
+        name: speedtest-cli
+
+    - name: Run speed test
+      command: speedtest-cli --simple
+      register: speedtest_result
+      changed_when: false
+
+    - name: Check reboot requirement
+      shell: needs-restarting -r
+      register: reboot_status
+      failed_when: false
+      changed_when: false
+
+    - name: Send Telegram report
+      uri:
+        url: "https://api.telegram.org/bot{{ telegram_token }}/sendMessage"
+        method: POST
+        body_format: json
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: |
+            ✅ Server Maintenance Complete
+
+            Host: {{ inventory_hostname }}
+
+            OS:
+            {{ ansible_distribution }}
+            {{ ansible_distribution_version }}
+
+            Reboot Check:
+            {{ reboot_status.stdout }}
+
+            Speed Test:
+            {{ speedtest_result.stdout }}
