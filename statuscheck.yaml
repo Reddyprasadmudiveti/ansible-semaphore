@@ -5,6 +5,12 @@
 
   tasks:
 
+    - name: Debug Telegram Variables
+      debug:
+        msg:
+        - "Token={{ TELEGRAM_TOKEN }}"
+        - "ChatID={{ TELEGRAM_CHAT_ID }}"
+
     - name: Notify Start
       uri:
         url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
@@ -56,6 +62,8 @@
           register: reboot_status
           failed_when: false
           changed_when: false
+
+          
 
         - name: Send Success Report
           uri:
