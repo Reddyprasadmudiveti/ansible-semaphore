@@ -25,7 +25,7 @@
 
     - block:
 
-        - name: Gather facts
+        - name: Gather facts   
           setup:
 
         - name: Check updates before upgrade
@@ -39,6 +39,42 @@
             name: "*"
             state: latest
             update_cache: true
+      ---
+- name: Check and install Python and pip
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Check Python installation
+      command: python3 --version
+      register: python_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Check pip installation
+      command: pip3 --version
+      register: pip_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Python and pip if missing
+      apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+      when: python_check.rc != 0 or pip_check.rc != 0
+
+    - name: Show Python version
+      debug:
+        var: python_check.stdout
+      when: python_check.rc == 0
+
+    - name: Show pip version
+      debug:
+        var: pip_check.stdout
+      when: pip_check.rc == 0
 
         - name: Check if speedtest-cli is installed
           command: which speedtest-cli
