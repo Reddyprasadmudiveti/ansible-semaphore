@@ -4,22 +4,20 @@
   become: true
 
   tasks:
-    - name: Add Ookla repository
-      shell: |
-        curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.rpm.sh | bash
-      args:
-        creates: /etc/yum.repos.d/ookla_speedtest-cli.repo
-
-    - name: Install Speedtest CLI
+    - name: Install pip
       yum:
-        name: speedtest
+        name: python3-pip
         state: present
 
-    - name: Run Speedtest
-      command: speedtest --accept-license --accept-gdpr
-      register: speedtest_result
+    - name: Install speedtest-cli
+      pip:
+        name: speedtest-cli
+
+    - name: Run speed test
+      command: speedtest-cli --simple
+      register: result
       changed_when: false
 
-    - name: Show Speedtest Results
+    - name: Show result
       debug:
-        msg: "{{ speedtest_result.stdout_lines }}"
+        var: result.stdout_lines
