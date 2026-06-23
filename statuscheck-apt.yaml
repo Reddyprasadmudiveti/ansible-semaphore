@@ -2,9 +2,7 @@
 - name: Update Server and Send Report
   hosts: all
   become: true
-
   tasks:
-
     - name: Notify Start
       uri:
         url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
@@ -12,26 +10,34 @@
         body_format: json
         body:
           chat_id: "{{ TELEGRAM_CHAT_ID }}"
+          parse_mode: "Markdown"
           text: |
-            🚀 Server Maintenance Started
-
-            Host: {{ inventory_hostname }}
+            🚀 *Server Maintenance Started*
+            Host: `{{ inventory_hostname }}`
 
     - block:
-
         - name: Gather facts
           setup:
 
-        - name: Ensure required packages are installed
-          apt:
-            name:
-              - python3
-              - python3-pip
-              - speedtest-cli
-           state: present
-           update_cache: yes
+        - name: Check if python3 is installed
+          command: python3 --version
+          register: python_check
+          changed_when: false
+          failed_when: false
 
-        - name: Install Python and pip if missing
+        - name: Check if pip3 is installed
+          command: pip3 --version
+          register: pip_check
+          changed_when: false
+          failed_when: false
+
+        - name: Check if speedtest-cli is installed
+          command: which speedtest-cli
+          register: speedtest_check
+          changed_when: false
+          failed_when: false
+
+        - name: Install python3 and pip3 if missing
           apt:
             name:
               - python3
@@ -40,17 +46,17 @@
             update_cache: yes
           when: python_check.rc != 0 or pip_check.rc != 0
 
-        - name: Check available updates
-          shell: apt list --upgradable 2>/dev/null
-          register: updates_before
-          changed_when: false
-          failed_when: false
-
         - name: Install speedtest-cli if missing
           pip:
             name: speedtest-cli
             state: present
           when: speedtest_check.rc != 0
+
+        - name: Check available updates
+          shell: apt list --upgradable 2>/dev/null
+          register: updates_before
+          changed_when: false
+          failed_when: false
 
         - name: Upgrade all packages
           apt:
@@ -75,32 +81,21 @@
             body_format: json
             body:
               chat_id: "{{ TELEGRAM_CHAT_ID }}"
+              parse_mode: "Markdown"
               text: |
-                ✅ Server Maintenance Complete
-
-                Host: {{ inventory_hostname }}
-
-                OS:
-                {{ ansible_distribution }}
-                {{ ansible_distribution_version }}
-
-                Python:
-                {{ python_check.stdout | default('Installed During Run') }}
-
-                Pip:
-                {{ pip_check.stdout | default('Installed During Run') }}
-
-                Speedtest Status:
-                {{ 'Already Installed' if speedtest_check.rc == 0 else 'Installed During Run' }}
-
-                Reboot Required:
-                {{ reboot_required.stat.exists }}
-
+                ✅ *Server Maintenance Complete*
+                Host: `{{ inventory_hostname }}`
+                OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+                Python: {{ python_check.stdout | default('Installed During Run') }}
+                Pip: {{ pip_check.stdout | default('Installed During Run') }}
+                Speedtest: {{ 'Already Installed' if speedtest_check.rc == 0 else 'Installed During Run' }}
+                Reboot Required: {{ reboot_required.stat.exists }}
                 Speed Test:
+                ```
                 {{ speedtest_result.stdout }}
+                ```
 
       rescue:
-
         - name: Send Failure Report
           uri:
             url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
@@ -108,19 +103,14 @@
             body_format: json
             body:
               chat_id: "{{ TELEGRAM_CHAT_ID }}"
+              parse_mode: "Markdown"
               text: |
-                ❌ Server Maintenance Failed
-
-                Host: {{ inventory_hostname }}
-
-                Failed Task:
-                {{ ansible_failed_task.name }}
-
-                Error:
-                {{ ansible_failed_result.msg | default(ansible_failed_result.stderr, true) }}
+                ❌ *Server Maintenance Failed*
+                Host: `{{ inventory_hostname }}`
+                Failed Task: {{ ansible_failed_task.name }}
+                Error: {{ ansible_failed_result.msg | default(ansible_failed_result.stderr, true) }}
 
       always:
-
         - name: Workflow Finished
           debug:
             msg: "Workflow execution completed."
