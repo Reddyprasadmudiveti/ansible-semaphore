@@ -24,12 +24,12 @@
 
         - name: Ensure required packages are installed
           apt:
-           name:
-            - python3
-            - python3-pip
-            - speedtest-cli
-          state: present
-          update_cache: yes
+            name:
+              - python3
+              - python3-pip
+              - speedtest-cli
+           state: present
+           update_cache: yes
 
         - name: Install Python and pip if missing
           apt:
