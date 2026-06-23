@@ -2,11 +2,7 @@
 - name: Update Server and Send Report
   hosts: all
   become: true
-
-  vars:
-    telegram_token: "{{ lookup('env', 'TELEGRAM_TOKEN') }}"
-    telegram_chat_id: "{{ lookup('env', 'TELEGRAM_CHAT_ID') }}"
-
+  
   tasks:
 
     - name: Gather facts
