@@ -2,45 +2,10 @@
 - name: Update Server and Send Report
   hosts: all
   become: true
-  
+
   tasks:
 
-    - name: Gather facts
-      setup:
-
-    - name: Check updates before upgrade
-      shell: dnf check-update
-      register: updates_before
-      failed_when: false
-      changed_when: false
-
-    - name: Upgrade all packages
-      dnf:
-        name: "*"
-        state: latest
-        update_cache: true
-
-    - name: Install speedtest-cli
-      pip:
-        name: speedtest-cli
-
-    - name: Run speed test
-      command: speedtest-cli --simple
-      register: speedtest_result
-      changed_when: false
-
-    - name: Check reboot requirement
-      shell: needs-restarting -r
-      register: reboot_status
-      failed_when: false
-      changed_when: false
-    - name: Debug Telegram Variables
-      debug:
-        msg:
-        - "Token={{ TELEGRAM_TOKEN }}"
-        - "ChatID={{ TELEGRAM_CHAT_ID }}"
-
-    - name: Send Telegram report
+    - name: Notify Start
       uri:
         url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
         method: POST
@@ -48,16 +13,97 @@
         body:
           chat_id: "{{ TELEGRAM_CHAT_ID }}"
           text: |
-            ✅ Server Maintenance Complete
+            🚀 Server Maintenance Started
 
             Host: {{ inventory_hostname }}
 
-            OS:
-            {{ ansible_distribution }}
-            {{ ansible_distribution_version }}
+    - block:
 
-            Reboot Check:
-            {{ reboot_status.stdout }}
+        - name: Gather facts
+          setup:
 
-            Speed Test:
-            {{ speedtest_result.stdout }}
+        - name: Check updates before upgrade
+          shell: dnf check-update
+          register: updates_before
+          failed_when: false
+          changed_when: false
+
+        - name: Upgrade all packages
+          dnf:
+            name: "*"
+            state: latest
+            update_cache: true
+
+        - name: Check if speedtest-cli is installed
+          command: which speedtest-cli
+          register: speedtest_check
+          failed_when: false
+          changed_when: false
+
+        - name: Install speedtest-cli if missing
+          pip:
+            name: speedtest-cli
+            state: present
+          when: speedtest_check.rc != 0
+
+        - name: Run speed test
+          command: speedtest-cli --simple
+          register: speedtest_result
+          changed_when: false
+
+        - name: Check reboot requirement
+          shell: needs-restarting -r
+          register: reboot_status
+          failed_when: false
+          changed_when: false
+
+        - name: Send Success Report
+          uri:
+            url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
+            method: POST
+            body_format: json
+            body:
+              chat_id: "{{ TELEGRAM_CHAT_ID }}"
+              text: |
+                ✅ Server Maintenance Complete
+
+                Host: {{ inventory_hostname }}
+
+                OS:
+                {{ ansible_distribution }}
+                {{ ansible_distribution_version }}
+
+                Speedtest Status:
+                {{ 'Already Installed' if speedtest_check.rc == 0 else 'Installed During Run' }}
+
+                Reboot Check:
+                {{ reboot_status.stdout | default('No reboot required') }}
+
+                Speed Test:
+                {{ speedtest_result.stdout }}
+
+      rescue:
+
+        - name: Send Failure Report
+          uri:
+            url: "https://api.telegram.org/bot{{ TELEGRAM_TOKEN }}/sendMessage"
+            method: POST
+            body_format: json
+            body:
+              chat_id: "{{ TELEGRAM_CHAT_ID }}"
+              text: |
+                ❌ Server Maintenance Failed
+
+                Host: {{ inventory_hostname }}
+
+                Failed Task:
+                {{ ansible_failed_task.name }}
+
+                Error:
+                {{ ansible_failed_result.msg | default(ansible_failed_result.stderr, true) | default('Unknown Error') }}
+
+      always:
+
+        - name: Workflow Finished
+          debug:
+            msg: "Workflow execution completed."
