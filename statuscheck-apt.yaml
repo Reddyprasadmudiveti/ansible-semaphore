@@ -46,11 +46,23 @@
             update_cache: yes
           when: python_check.rc != 0 or pip_check.rc != 0
 
-        - name: Install speedtest-cli if missing
+        - name: Install speedtest-cli via apt if missing
+          apt:
+            name: speedtest-cli
+            state: present
+            update_cache: yes
+          register: speedtest_apt
+          failed_when: false
+          when: speedtest_check.rc != 0
+
+        - name: Install speedtest-cli via pip as fallback (PEP 668 safe)
           pip:
             name: speedtest-cli
             state: present
-          when: speedtest_check.rc != 0
+            extra_args: "--break-system-packages"
+          when:
+            - speedtest_check.rc != 0
+            - speedtest_apt.failed is defined and speedtest_apt.failed
 
         - name: Check available updates
           shell: apt list --upgradable 2>/dev/null
